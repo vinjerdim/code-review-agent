@@ -24,4 +24,4 @@ endif
 ifndef REPO
 	$(error REPO is required: make review PR=<number> REPO=<owner/name>)
 endif
-	uv run reviewer --pr $(PR) --repo $(REPO)
+	uv run reviewer --pr $(PR) --repo $(REPO) $(ARGS)

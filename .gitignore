@@ -9,3 +9,4 @@ build/
 .env
 *.pem
 evals/results/
+.vscode/

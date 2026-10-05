@@ -25,5 +25,7 @@ def test_cli_requires_pr_and_repo():
     assert exc.value.code == 2
 
 
-def test_cli_not_implemented_returns_nonzero():
-    assert cli.main(["--pr", "1", "--repo", "o/r"]) == 1
+def test_cli_requires_github_token(monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    assert cli.main(["--pr", "1", "--repo", "o/r", "--dry-run"]) == 2
+    assert "GITHUB_TOKEN" in capsys.readouterr().err
