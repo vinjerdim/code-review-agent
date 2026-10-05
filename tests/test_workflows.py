@@ -88,6 +88,15 @@ def test_checkout_does_not_persist_credentials(review):
     assert checkout["with"]["persist-credentials"] is False
 
 
+def test_checkout_pins_pr_head_for_agentic_tools(review):
+    checkout = next(
+        s for s in review["jobs"]["review"]["steps"] if "actions/checkout" in s.get("uses", "")
+    )
+    assert checkout["with"]["ref"] == "${{ github.event.pull_request.head.sha }}"
+    review_step = next(s for s in review["jobs"]["review"]["steps"] if s.get("name") == "Review")
+    assert review_step["env"]["REVIEWER_MODE"] == "${{ vars.REVIEWER_MODE }}"
+
+
 def test_never_approves(review_text):
     assert "APPROVE" not in review_text
     assert "REQUEST_CHANGES" not in review_text

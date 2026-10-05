@@ -56,7 +56,7 @@ class ReviewContext:
     skipped: list[SkippedFile] = field(default_factory=list)
 
 
-def _path_reason(path: str) -> str | None:
+def path_skip_reason(path: str) -> str | None:
     p = PurePosixPath(path)
     name = p.name
     parts = p.parts
@@ -76,7 +76,7 @@ def _path_reason(path: str) -> str | None:
 def skip_reason(f: PRFile) -> str | None:
     """Why `f` must not be sent to the model, or None if it may be reviewed."""
     for path in (f.filename, f.previous_filename):
-        if path and (reason := _path_reason(path)):
+        if path and (reason := path_skip_reason(path)):
             return reason
     if f.status == "removed":
         return "removed"
@@ -174,7 +174,7 @@ def _line_kind(raw: str, is_header: bool, in_hunk: bool) -> str:
     return "add" if raw.startswith("+") else "ctx"
 
 
-def _escape(text: str) -> str:
+def escape_untrusted(text: str) -> str:
     # Stop untrusted text from closing our delimiter tags.
     return text.replace("</untrusted_", "<\\/untrusted_")
 
@@ -186,27 +186,27 @@ def render_user_prompt(ctx: ReviewContext) -> str:
         "the change, using line numbers from the left-hand column (new-file lines).",
         "",
         "<untrusted_pr_metadata>",
-        f"Repository: {_escape(pr.repo)}",
-        f"PR #{pr.number} by {_escape(pr.author)}",
-        f"Title: {_escape(pr.title)}",
+        f"Repository: {escape_untrusted(pr.repo)}",
+        f"PR #{pr.number} by {escape_untrusted(pr.author)}",
+        f"Title: {escape_untrusted(pr.title)}",
         "Description:",
-        _escape(pr.body) or "(empty)",
+        escape_untrusted(pr.body) or "(empty)",
         "</untrusted_pr_metadata>",
         "",
     ]
     for f in ctx.files:
-        header = f"File: {_escape(f.filename)} (status: {f.status}"
+        header = f"File: {escape_untrusted(f.filename)} (status: {f.status}"
         if f.previous_filename and f.previous_filename != f.filename:
-            header += f", renamed from {_escape(f.previous_filename)}"
+            header += f", renamed from {escape_untrusted(f.previous_filename)}"
         header += ")"
         parts += [
-            f'<untrusted_diff file="{_escape(f.filename)}">',
+            f'<untrusted_diff file="{escape_untrusted(f.filename)}">',
             header,
-            _escape(annotate_patch(f.patch or "")),
+            escape_untrusted(annotate_patch(f.patch or "")),
             "</untrusted_diff>",
             "",
         ]
     if ctx.skipped:
         parts.append("Files changed in this PR but not shown to you (do not comment on them):")
-        parts += [f"- {_escape(s.filename)} ({s.reason})" for s in ctx.skipped]
+        parts += [f"- {escape_untrusted(s.filename)} ({s.reason})" for s in ctx.skipped]
     return "\n".join(parts).rstrip() + "\n"

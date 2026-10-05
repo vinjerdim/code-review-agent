@@ -9,6 +9,8 @@ from typing import Literal
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 _EFFORTS = ("low", "medium", "high", "xhigh", "max")
+Mode = Literal["single", "agentic"]
+_MODES = ("single", "agentic")
 
 
 def _int_env(env: dict[str, str], name: str, default: int) -> int:
@@ -42,6 +44,11 @@ class Settings:
     max_total_patch_chars: int = 200_000
     min_confidence: float = 0.7
     max_comments: int = 8
+    # Agentic mode: bounded read-only tool loop over a checkout at repo_root.
+    mode: Mode = "single"
+    max_steps: int = 8
+    max_agent_tokens: int = 300_000
+    repo_root: str = "."
     github_token: str | None = None
 
     @classmethod
@@ -50,6 +57,9 @@ class Settings:
         effort = env.get("REVIEWER_EFFORT") or cls.effort
         if effort not in _EFFORTS:
             raise ValueError(f"REVIEWER_EFFORT must be one of {_EFFORTS}, got {effort!r}")
+        mode = env.get("REVIEWER_MODE") or cls.mode
+        if mode not in _MODES:
+            raise ValueError(f"REVIEWER_MODE must be one of {_MODES}, got {mode!r}")
         fallbacks = env.get("REVIEWER_FALLBACKS", cls.fallbacks or "")
         return cls(
             model=env.get("REVIEWER_MODEL") or cls.model,
@@ -64,5 +74,9 @@ class Settings:
             ),
             min_confidence=_float_env(env, "REVIEWER_MIN_CONFIDENCE", cls.min_confidence),
             max_comments=_int_env(env, "REVIEWER_MAX_COMMENTS", cls.max_comments),
+            mode=mode,
+            max_steps=_int_env(env, "REVIEWER_MAX_STEPS", cls.max_steps),
+            max_agent_tokens=_int_env(env, "REVIEWER_MAX_AGENT_TOKENS", cls.max_agent_tokens),
+            repo_root=env.get("REVIEWER_REPO_ROOT") or cls.repo_root,
             github_token=env.get("GITHUB_TOKEN") or None,
         )

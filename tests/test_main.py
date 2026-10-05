@@ -31,6 +31,7 @@ def wired(monkeypatch):
 
     def fake_review(ctx, settings, client):
         state["model_calls"] += 1
+        state["mode"] = settings.mode
         finding = Finding(
             file="src/app.py",
             line=22,
@@ -43,7 +44,7 @@ def wired(monkeypatch):
             result=ReviewResult(summary="One issue.", findings=[finding]), model="m"
         )
 
-    monkeypatch.setattr(cli, "review_single_pass", fake_review)
+    monkeypatch.setattr(cli, "review", fake_review)
     return state
 
 
@@ -68,3 +69,18 @@ def test_already_reviewed_commit_skips_model_and_post(wired):
     assert cli.main(["--pr", "7", "--repo", "octo/demo"]) == 0
     assert wired["model_calls"] == 0
     assert wired["posted"] == []
+
+
+def test_mode_flag_overrides_env(wired, monkeypatch, capsys):
+    monkeypatch.setenv("REVIEWER_MODE", "single")
+    assert cli.main(["--pr", "7", "--repo", "octo/demo", "--dry-run", "--mode", "agentic"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert wired["mode"] == "agentic"
+    assert out["mode"] == "agentic"
+    assert out["tool_calls"] == []
+
+
+def test_mode_defaults_to_env(wired, monkeypatch):
+    monkeypatch.setenv("REVIEWER_MODE", "agentic")
+    cli.main(["--pr", "7", "--repo", "octo/demo", "--dry-run"])
+    assert wired["mode"] == "agentic"

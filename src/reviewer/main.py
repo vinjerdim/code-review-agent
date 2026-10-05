@@ -4,11 +4,11 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any
 
 from reviewer import github_io
-from reviewer.agent import ReviewError, ReviewOutcome, review_single_pass
+from reviewer.agent import ReviewError, ReviewOutcome, review
 from reviewer.config import Settings
 from reviewer.context import ReviewContext, build_context
 from reviewer.postprocess import REVIEW_MARKER, PostPlan, plan_review
@@ -25,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print the planned review as JSON instead of posting it",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["single", "agentic"],
+        help="single: one model call; agentic: read-only tool loop (default: REVIEWER_MODE)",
+    )
     return parser
 
 
@@ -34,7 +39,7 @@ def make_anthropic() -> Any:
     return anthropic.Anthropic()
 
 
-def report(ctx: ReviewContext, outcome: ReviewOutcome, plan: PostPlan) -> dict:
+def report(ctx: ReviewContext, outcome: ReviewOutcome, plan: PostPlan, mode: str) -> dict:
     return {
         "repo": ctx.pr.repo,
         "pr": ctx.pr.number,
@@ -42,7 +47,10 @@ def report(ctx: ReviewContext, outcome: ReviewOutcome, plan: PostPlan) -> dict:
         "model": outcome.model,
         "stop_reason": outcome.stop_reason,
         "refusal": outcome.refusal,
+        "mode": mode,
         "attempts": outcome.attempts,
+        "steps": outcome.steps,
+        "tool_calls": [asdict(t) for t in outcome.tool_calls],
         "usage": asdict(outcome.usage),
         "reviewed_files": [f.filename for f in ctx.files],
         "skipped_files": [asdict(s) for s in ctx.skipped],
@@ -58,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     settings = Settings.from_env()
+    if args.mode:
+        settings = replace(settings, mode=args.mode)
     if not settings.github_token:
         print("reviewer: GITHUB_TOKEN is not set", file=sys.stderr)
         return 2
@@ -73,18 +83,23 @@ def main(argv: list[str] | None = None) -> int:
 
     ctx = build_context(pr, settings)
     try:
-        outcome = review_single_pass(ctx, settings, make_anthropic())
+        outcome = review(ctx, settings, make_anthropic())
     except ReviewError as exc:
         print(f"reviewer: {exc}", file=sys.stderr)
         return 1
 
     plan = plan_review(outcome.result, ctx, settings, outcome.model)
     if args.dry_run:
-        print(json.dumps(report(ctx, outcome, plan), indent=2))
+        print(json.dumps(report(ctx, outcome, plan, settings.mode), indent=2, default=str))
         return 0
 
     github_io.post_review(pull, pr.head_sha, plan.body, [c.to_github() for c in plan.comments])
-    log.info("posted review with %d inline comment(s)", len(plan.comments))
+    log.info(
+        "posted review with %d inline comment(s) [%s mode, %d tool calls]",
+        len(plan.comments),
+        settings.mode,
+        len(outcome.tool_calls),
+    )
     return 0
 
 

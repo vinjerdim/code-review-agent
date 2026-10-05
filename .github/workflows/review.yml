@@ -37,9 +37,13 @@ jobs:
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Check out the exact PR head so agentic-mode tools read what is being reviewed.
+      # Shallow by default; set vars.REVIEWER_FETCH_DEPTH (0 = full) for useful git_blame.
       - uses: actions/checkout@v4
         if: steps.guard.outputs.run == 'true'
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: ${{ vars.REVIEWER_FETCH_DEPTH || 1 }}
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@v6
@@ -58,6 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          REVIEWER_MODE: ${{ vars.REVIEWER_MODE }}
           REVIEWER_MODEL: ${{ vars.REVIEWER_MODEL }}
           REVIEWER_EFFORT: ${{ vars.REVIEWER_EFFORT }}
           REVIEWER_MIN_CONFIDENCE: ${{ vars.REVIEWER_MIN_CONFIDENCE }}

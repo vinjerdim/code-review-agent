@@ -36,6 +36,10 @@ def test_empty_values_fall_back_to_defaults():
         "REVIEWER_MIN_CONFIDENCE",
         "REVIEWER_MAX_COMMENTS",
         "REVIEWER_MAX_TOKENS",
+        "REVIEWER_MODE",
+        "REVIEWER_MAX_STEPS",
+        "REVIEWER_MAX_AGENT_TOKENS",
+        "REVIEWER_REPO_ROOT",
     ]
     assert Settings.from_env(dict.fromkeys(keys, "")) == Settings()
 
@@ -46,6 +50,8 @@ def test_empty_values_fall_back_to_defaults():
         {"REVIEWER_EFFORT": "turbo"},
         {"REVIEWER_MAX_TOKENS": "lots"},
         {"REVIEWER_MIN_CONFIDENCE": "high"},
+        {"REVIEWER_MODE": "yolo"},
+        {"REVIEWER_MAX_STEPS": "many"},
     ],
 )
 def test_invalid_env_rejected(env):
