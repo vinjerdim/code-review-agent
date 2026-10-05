@@ -21,6 +21,16 @@ def _int_env(env: dict[str, str], name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer, got {raw!r}") from exc
 
 
+def _float_env(env: dict[str, str], name: str, default: float) -> float:
+    raw = env.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number, got {raw!r}") from exc
+
+
 @dataclass(frozen=True)
 class Settings:
     model: str = "claude-opus-5-5"
@@ -30,6 +40,8 @@ class Settings:
     fallbacks: str | None = "default"
     max_file_patch_chars: int = 20_000
     max_total_patch_chars: int = 200_000
+    min_confidence: float = 0.7
+    max_comments: int = 8
     github_token: str | None = None
 
     @classmethod
@@ -50,5 +62,7 @@ class Settings:
             max_total_patch_chars=_int_env(
                 env, "REVIEWER_MAX_TOTAL_PATCH_CHARS", cls.max_total_patch_chars
             ),
+            min_confidence=_float_env(env, "REVIEWER_MIN_CONFIDENCE", cls.min_confidence),
+            max_comments=_int_env(env, "REVIEWER_MAX_COMMENTS", cls.max_comments),
             github_token=env.get("GITHUB_TOKEN") or None,
         )

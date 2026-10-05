@@ -5,6 +5,7 @@ Nothing reaches the model unless it passes `filter_files` here first.
 
 import fnmatch
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
@@ -120,22 +121,57 @@ def annotate_patch(patch: str) -> str:
     because they cannot carry an inline comment on the new side.
     """
     out: list[str] = []
+    for pl in iter_patch_lines(patch):
+        if pl.kind == "hunk":
+            out.append(pl.text)
+        elif pl.new_line is None:
+            out.append(f"{'':>6} {pl.text}")
+        else:
+            out.append(f"{pl.new_line:>6} {pl.text}")
+    return "\n".join(out)
+
+
+@dataclass(frozen=True)
+class PatchLine:
+    kind: str  # "hunk" | "add" | "del" | "ctx" | "meta"
+    text: str
+    new_line: int | None  # line number in the new file; only for "add" and "ctx"
+    position: int | None  # GitHub diff position; None for the first hunk header
+
+
+def iter_patch_lines(patch: str) -> Iterator[PatchLine]:
+    """Walk a GitHub file patch, tracking new-file line numbers and diff positions.
+
+    GitHub defines position as the number of lines below the first "@@" header:
+    the line right after it is position 1, and every later line (including later
+    hunk headers, removed lines, and "\\ No newline" markers) advances it by one.
+    """
     new_line: int | None = None
-    for raw in patch.splitlines():
+    first_hunk: int | None = None
+    for i, raw in enumerate(patch.splitlines()):
         m = _HUNK_RE.match(raw)
         if m:
             new_line = int(m.group(1))
-            out.append(raw)
-            continue
-        if new_line is None or raw.startswith("\\"):
-            out.append(f"{'':>6} {raw}")
-            continue
-        if raw.startswith("-"):
-            out.append(f"{'':>6} {raw}")
-        else:  # "+" or " " (context); a bare empty line is context too
-            out.append(f"{new_line:>6} {raw}")
-            new_line += 1
-    return "\n".join(out)
+            if first_hunk is None:
+                first_hunk = i
+        position = i - first_hunk if first_hunk is not None and i > first_hunk else None
+        kind = _line_kind(raw, m is not None, in_hunk=new_line is not None)
+        if kind in ("add", "ctx"):
+            yield PatchLine(kind, raw, new_line, position)
+            new_line += 1  # type: ignore[operator]  # in_hunk guarantees an int
+        else:
+            yield PatchLine(kind, raw, None, position)
+
+
+def _line_kind(raw: str, is_header: bool, in_hunk: bool) -> str:
+    if is_header:
+        return "hunk"
+    if not in_hunk or raw.startswith("\\"):
+        return "meta"
+    if raw.startswith("-"):
+        return "del"
+    # "+" or " " (context); a bare empty line is context too
+    return "add" if raw.startswith("+") else "ctx"
 
 
 def _escape(text: str) -> str:

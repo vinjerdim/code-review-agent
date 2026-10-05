@@ -5,10 +5,15 @@ import json
 import logging
 import sys
 from dataclasses import asdict
+from typing import Any
 
+from reviewer import github_io
 from reviewer.agent import ReviewError, ReviewOutcome, review_single_pass
 from reviewer.config import Settings
 from reviewer.context import ReviewContext, build_context
+from reviewer.postprocess import REVIEW_MARKER, PostPlan, plan_review
+
+log = logging.getLogger("reviewer")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,12 +23,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print findings as JSON instead of posting (the only mode until posting lands)",
+        help="Print the planned review as JSON instead of posting it",
     )
     return parser
 
 
-def report(ctx: ReviewContext, outcome: ReviewOutcome) -> dict:
+def make_anthropic() -> Any:
+    import anthropic
+
+    return anthropic.Anthropic()
+
+
+def report(ctx: ReviewContext, outcome: ReviewOutcome, plan: PostPlan) -> dict:
     return {
         "repo": ctx.pr.repo,
         "pr": ctx.pr.number,
@@ -35,7 +46,10 @@ def report(ctx: ReviewContext, outcome: ReviewOutcome) -> dict:
         "usage": asdict(outcome.usage),
         "reviewed_files": [f.filename for f in ctx.files],
         "skipped_files": [asdict(s) for s in ctx.skipped],
-        **outcome.result.model_dump(),
+        "summary": outcome.result.summary,
+        "comments": [{**c.finding.model_dump(), "position": c.position} for c in plan.comments],
+        "dropped": [{**d.finding.model_dump(), "reason": d.reason} for d in plan.dropped],
+        "review_body": plan.body,
     }
 
 
@@ -48,22 +62,29 @@ def main(argv: list[str] | None = None) -> int:
         print("reviewer: GITHUB_TOKEN is not set", file=sys.stderr)
         return 2
 
-    # Imported lazily so `--help` and argument errors need no SDK setup.
-    import anthropic
+    gh = github_io.make_github(settings.github_token)
+    pull = github_io.get_pull(gh, args.repo, args.pr)
+    pr = github_io.pr_data_from_pull(pull, args.repo, args.pr)
 
-    from reviewer.github_io import fetch_pr, make_github
+    # Check before calling the model so re-runs on the same commit cost nothing.
+    if not args.dry_run and github_io.has_existing_review(pull, pr.head_sha, REVIEW_MARKER):
+        log.info("already reviewed %s; skipping", pr.head_sha)
+        return 0
 
-    pr = fetch_pr(make_github(settings.github_token), args.repo, args.pr)
     ctx = build_context(pr, settings)
     try:
-        outcome = review_single_pass(ctx, settings, anthropic.Anthropic())
+        outcome = review_single_pass(ctx, settings, make_anthropic())
     except ReviewError as exc:
         print(f"reviewer: {exc}", file=sys.stderr)
         return 1
 
-    if not args.dry_run:
-        print("reviewer: posting is not implemented yet; printing findings", file=sys.stderr)
-    print(json.dumps(report(ctx, outcome), indent=2))
+    plan = plan_review(outcome.result, ctx, settings, outcome.model)
+    if args.dry_run:
+        print(json.dumps(report(ctx, outcome, plan), indent=2))
+        return 0
+
+    github_io.post_review(pull, pr.head_sha, plan.body, [c.to_github() for c in plan.comments])
+    log.info("posted review with %d inline comment(s)", len(plan.comments))
     return 0
 
 

@@ -5,8 +5,12 @@ pipeline (and its tests) never touches the network.
 """
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from github import Auth, Github
+
+# The agent never approves or requests changes. Not a parameter on purpose.
+REVIEW_EVENT = "COMMENT"
 
 
 @dataclass(frozen=True)
@@ -35,8 +39,11 @@ def make_github(token: str) -> Github:
     return Github(auth=Auth.Token(token))
 
 
-def fetch_pr(gh: Github, repo: str, number: int) -> PRData:
-    pull = gh.get_repo(repo).get_pull(number)
+def get_pull(gh: Github, repo: str, number: int) -> Any:
+    return gh.get_repo(repo).get_pull(number)
+
+
+def pr_data_from_pull(pull: Any, repo: str, number: int) -> PRData:
     files = [
         PRFile(
             filename=f.filename,
@@ -58,3 +65,18 @@ def fetch_pr(gh: Github, repo: str, number: int) -> PRData:
         head_sha=pull.head.sha,
         files=files,
     )
+
+
+def fetch_pr(gh: Github, repo: str, number: int) -> PRData:
+    return pr_data_from_pull(get_pull(gh, repo, number), repo, number)
+
+
+def has_existing_review(pull: Any, head_sha: str, marker: str) -> bool:
+    """True if this agent already reviewed `head_sha` (identified by `marker`)."""
+    return any(r.commit_id == head_sha and marker in (r.body or "") for r in pull.get_reviews())
+
+
+def post_review(pull: Any, head_sha: str, body: str, comments: list[dict]) -> Any:
+    """Post one review pinned to `head_sha`, so diff positions match what we reviewed."""
+    commit = pull.base.repo.get_commit(head_sha)
+    return pull.create_review(commit=commit, body=body, event=REVIEW_EVENT, comments=comments)
