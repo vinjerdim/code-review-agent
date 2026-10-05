@@ -1,0 +1,65 @@
+name: AI PR review
+
+# pull_request (never pull_request_target): fork PRs run without secrets and
+# without write access, so untrusted code never sees the API key.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Same-repo, non-draft PRs only; fork PRs never receive repo secrets.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-ai-review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check for API key
+        id: guard
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not available to this run; skipping AI review."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.run == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.guard.outputs.run == 'true'
+        with:
+          enable-cache: true
+
+      - name: Install
+        if: steps.guard.outputs.run == 'true'
+        run: uv sync --locked --no-dev
+
+      - name: Review
+        if: steps.guard.outputs.run == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          REVIEWER_MODEL: ${{ vars.REVIEWER_MODEL }}
+          REVIEWER_EFFORT: ${{ vars.REVIEWER_EFFORT }}
+          REVIEWER_MIN_CONFIDENCE: ${{ vars.REVIEWER_MIN_CONFIDENCE }}
+          REVIEWER_MAX_COMMENTS: ${{ vars.REVIEWER_MAX_COMMENTS }}
+        run: uv run --no-sync reviewer --pr "$PR_NUMBER" --repo "$REPO"

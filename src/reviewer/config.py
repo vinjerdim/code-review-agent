@@ -47,7 +47,7 @@ class Settings:
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "Settings":
         env = dict(os.environ) if env is None else env
-        effort = env.get("REVIEWER_EFFORT", cls.effort)
+        effort = env.get("REVIEWER_EFFORT") or cls.effort
         if effort not in _EFFORTS:
             raise ValueError(f"REVIEWER_EFFORT must be one of {_EFFORTS}, got {effort!r}")
         fallbacks = env.get("REVIEWER_FALLBACKS", cls.fallbacks or "")

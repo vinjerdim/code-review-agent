@@ -15,7 +15,9 @@ reviewer = "reviewer.main:main"
 
 [dependency-groups]
 dev = [
+    "actionlint-py>=1.7",
     "pytest>=8.0",
+    "pyyaml>=6.0",
     "ruff>=0.6",
 ]
 

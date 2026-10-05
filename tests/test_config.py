@@ -28,7 +28,26 @@ def test_env_overrides():
     )
 
 
-@pytest.mark.parametrize("env", [{"REVIEWER_EFFORT": "turbo"}, {"REVIEWER_MAX_TOKENS": "lots"}])
+def test_empty_values_fall_back_to_defaults():
+    """Unset GitHub repo variables arrive as empty strings in the workflow."""
+    keys = [
+        "REVIEWER_MODEL",
+        "REVIEWER_EFFORT",
+        "REVIEWER_MIN_CONFIDENCE",
+        "REVIEWER_MAX_COMMENTS",
+        "REVIEWER_MAX_TOKENS",
+    ]
+    assert Settings.from_env(dict.fromkeys(keys, "")) == Settings()
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"REVIEWER_EFFORT": "turbo"},
+        {"REVIEWER_MAX_TOKENS": "lots"},
+        {"REVIEWER_MIN_CONFIDENCE": "high"},
+    ],
+)
 def test_invalid_env_rejected(env):
     with pytest.raises(ValueError):
         Settings.from_env(env)
