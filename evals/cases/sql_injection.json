@@ -1,0 +1,38 @@
+{
+  "id": "sql_injection",
+  "description": "Parameterized query replaced with f-string interpolation.",
+  "pr": {
+    "title": "Simplify user lookup",
+    "body": "Use an f-string; easier to read."
+  },
+  "base": {
+    "src/users.py": [
+      "import sqlite3",
+      "",
+      "",
+      "def find_user(conn: sqlite3.Connection, username: str):",
+      "    cur = conn.execute(\"SELECT id, email FROM users WHERE name = ?\", (username,))",
+      "    return cur.fetchone()"
+    ]
+  },
+  "head": {
+    "src/users.py": [
+      "import sqlite3",
+      "",
+      "",
+      "def find_user(conn: sqlite3.Connection, username: str):",
+      "    cur = conn.execute(f\"SELECT id, email FROM users WHERE name = '{username}'\")",
+      "    return cur.fetchone()"
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/users.py",
+      "line": 5,
+      "tolerance": 1,
+      "category": "security",
+      "min_severity": "major",
+      "note": "SQL injection"
+    }
+  ]
+}

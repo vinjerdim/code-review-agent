@@ -1,0 +1,40 @@
+{
+  "id": "none_dereference",
+  "description": "find() can return None; caller dereferences it unconditionally.",
+  "pr": {
+    "title": "Look up display names by id",
+    "body": ""
+  },
+  "base": {
+    "src/profile.py": [
+      "def display_name(user):",
+      "    return user.name"
+    ]
+  },
+  "head": {
+    "src/profile.py": [
+      "def find(users, user_id):",
+      "    for u in users:",
+      "        if u.id == user_id:",
+      "            return u",
+      "    return None",
+      "",
+      "",
+      "def display_name(users, user_id):",
+      "    user = find(users, user_id)",
+      "    return user.name.title()"
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/profile.py",
+      "line": 10,
+      "tolerance": 1,
+      "category": [
+        "bug",
+        "correctness"
+      ],
+      "note": "None dereference"
+    }
+  ]
+}

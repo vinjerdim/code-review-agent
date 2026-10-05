@@ -1,0 +1,25 @@
+{
+  "id": "lockfile_only",
+  "description": "Only a lockfile changed; must be filtered before the model and post nothing.",
+  "pr": {
+    "title": "Bump deps",
+    "body": ""
+  },
+  "base": {
+    "uv.lock": [
+      "version = 1",
+      "requires-python = \">=3.12\""
+    ],
+    "src/app.py": [
+      "x = 1"
+    ]
+  },
+  "head": {
+    "uv.lock": [
+      "version = 1",
+      "requires-python = \">=3.12\"",
+      "# bumped"
+    ]
+  },
+  "expected": []
+}

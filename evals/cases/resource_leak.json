@@ -1,0 +1,40 @@
+{
+  "id": "resource_leak",
+  "description": "File handle leaks when validation raises before close().",
+  "pr": {
+    "title": "Validate config version",
+    "body": "Reject configs without a version."
+  },
+  "base": {
+    "src/loader.py": [
+      "import json",
+      "",
+      "",
+      "def load_config(path):",
+      "    with open(path) as f:",
+      "        return json.load(f)"
+    ]
+  },
+  "head": {
+    "src/loader.py": [
+      "import json",
+      "",
+      "",
+      "def load_config(path):",
+      "    f = open(path)",
+      "    data = json.load(f)",
+      "    if \"version\" not in data:",
+      "        raise ValueError(\"missing version\")",
+      "    f.close()",
+      "    return data"
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/loader.py",
+      "line": 6,
+      "tolerance": 3,
+      "note": "handle not closed on error"
+    }
+  ]
+}

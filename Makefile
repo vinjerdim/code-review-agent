@@ -1,4 +1,4 @@
-.PHONY: install test lint fmt eval review
+.PHONY: install test lint fmt eval eval-report review
 
 install:
 	uv sync
@@ -16,7 +16,10 @@ fmt:
 	uv run ruff format .
 
 eval:
-	uv run python evals/run_evals.py
+	uv run python -m evals.run_evals $(ARGS)
+
+eval-report:
+	uv run python -m evals.report $(ARGS)
 
 review:
 ifndef PR

@@ -1,0 +1,33 @@
+{
+  "id": "clean_refactor",
+  "description": "Correct refactor with an explicit empty-input error; nothing to flag.",
+  "pr": {
+    "title": "Use sum() in mean()",
+    "body": "Also raise a clear error on empty input."
+  },
+  "base": {
+    "src/stats.py": [
+      "def mean(xs):",
+      "    total = 0",
+      "    for x in xs:",
+      "        total += x",
+      "    return total / len(xs)"
+    ]
+  },
+  "head": {
+    "src/stats.py": [
+      "def mean(xs):",
+      "    if not xs:",
+      "        raise ValueError(\"mean() of empty sequence\")",
+      "    return sum(xs) / len(xs)"
+    ]
+  },
+  "expected": [],
+  "must_not_flag": [
+    {
+      "file": "src/stats.py",
+      "line": 4,
+      "tolerance": 0
+    }
+  ]
+}

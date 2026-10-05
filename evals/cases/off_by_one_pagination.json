@@ -1,0 +1,48 @@
+{
+  "id": "off_by_one_pagination",
+  "description": "1-based page index treated as 0-based; page_count drops the partial last page.",
+  "pr": {
+    "title": "Add page_count helper",
+    "body": "Adds page_count and tidies page()."
+  },
+  "base": {
+    "src/pager.py": [
+      "def page(items, page_num, size):",
+      "    \"\"\"Return the 1-based page `page_num` of `items`.\"\"\"",
+      "    start = (page_num - 1) * size",
+      "    return items[start : start + size]"
+    ]
+  },
+  "head": {
+    "src/pager.py": [
+      "def page(items, page_num, size):",
+      "    \"\"\"Return the 1-based page `page_num` of `items`.\"\"\"",
+      "    start = page_num * size",
+      "    return items[start : start + size]",
+      "",
+      "",
+      "def page_count(items, size):",
+      "    return len(items) // size"
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/pager.py",
+      "line": 3,
+      "category": [
+        "bug",
+        "correctness"
+      ],
+      "note": "skips first page"
+    },
+    {
+      "file": "src/pager.py",
+      "line": 8,
+      "category": [
+        "bug",
+        "correctness"
+      ],
+      "note": "floor drops partial page"
+    }
+  ]
+}

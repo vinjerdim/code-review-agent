@@ -1,0 +1,51 @@
+{
+  "id": "renamed_file_with_bug",
+  "description": "File renamed and round() replaced with int() truncation (0.29 -> 28 cents).",
+  "pr": {
+    "title": "Move money helpers to currency module",
+    "body": "Pure move plus a small cleanup."
+  },
+  "base": {
+    "src/money.py": [
+      "def to_cents(amount: float) -> int:",
+      "    return round(amount * 100)",
+      "",
+      "",
+      "def from_cents(cents: int) -> float:",
+      "    return cents / 100",
+      "",
+      "",
+      "def fmt(cents: int) -> str:",
+      "    return f\"${cents / 100:.2f}\""
+    ]
+  },
+  "renames": {
+    "src/money.py": "src/currency.py"
+  },
+  "head": {
+    "src/currency.py": [
+      "def to_cents(amount: float) -> int:",
+      "    return int(amount * 100)",
+      "",
+      "",
+      "def from_cents(cents: int) -> float:",
+      "    return cents / 100",
+      "",
+      "",
+      "def fmt(cents: int) -> str:",
+      "    return f\"${cents / 100:.2f}\""
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/currency.py",
+      "line": 2,
+      "tolerance": 1,
+      "category": [
+        "bug",
+        "correctness"
+      ],
+      "note": "int() truncates float error"
+    }
+  ]
+}

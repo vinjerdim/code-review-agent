@@ -1,0 +1,51 @@
+{
+  "id": "missing_await",
+  "description": "Coroutine appended without await; callers get coroutine objects.",
+  "pr": {
+    "title": "Notify users sequentially",
+    "body": ""
+  },
+  "base": {
+    "src/notify.py": [
+      "import asyncio",
+      "",
+      "",
+      "async def send(user, message):",
+      "    await asyncio.sleep(0)",
+      "    return f\"sent {message} to {user}\"",
+      "",
+      "",
+      "async def notify_all(users, message):",
+      "    return await asyncio.gather(*(send(u, message) for u in users))"
+    ]
+  },
+  "head": {
+    "src/notify.py": [
+      "import asyncio",
+      "",
+      "",
+      "async def send(user, message):",
+      "    await asyncio.sleep(0)",
+      "    return f\"sent {message} to {user}\"",
+      "",
+      "",
+      "async def notify_all(users, message):",
+      "    results = []",
+      "    for user in users:",
+      "        results.append(send(user, message))",
+      "    return results"
+    ]
+  },
+  "expected": [
+    {
+      "file": "src/notify.py",
+      "line": 12,
+      "tolerance": 1,
+      "category": [
+        "bug",
+        "correctness"
+      ],
+      "note": "missing await"
+    }
+  ]
+}
